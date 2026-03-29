@@ -60,6 +60,7 @@
     font-weight: 700;
     line-height: 1.1;
     letter-spacing: -0.02em;
+    margin-top: 10px;
   }
 
   h1 span.wifi { color: var(--wifi); }
@@ -80,6 +81,16 @@
     font-size: 12px;
     color: var(--muted);
     font-family: 'Space Mono', monospace;
+  }
+
+  .name {
+    padding: 0;
+    font-size: 16px;
+    font-family: 'Space Mono', monospace;
+    color: var(--green);
+    font-weight: bold;
+    margin-top: 1.5rem;
+    margin-bottom: 24px;
   }
 
   .legend {
@@ -431,7 +442,8 @@
 <body>
 
 <header>
-  <div class="header-eyebrow">COMS 4419 — Measurement Study — Columbia Morningside Heights</div>
+  <div class="header-eyebrow">COMS 4419 — Internet Economics, Policy, and Technology</div>
+  <span class="name">Alexa Kafka &amp; Theo Zaritsky</span>
   <h1><span class="wifi">Wi-Fi</span> vs. <span class="cell">5G Cellular</span><br>Campus Network Performance</h1>
   <div class="legend">
     <div class="legend-item"><div class="legend-dot" style="background:var(--wifi)"></div> Columbia Wi-Fi</div>
@@ -442,7 +454,6 @@
     <span class="meta-pill">6 quadrants</span>
     <span class="meta-pill">AM + PM sessions</span>
     <span class="meta-pill">Indoor + Outdoor</span>
-    <span class="meta-pill">Alexa Kafka &amp; Theo Zaritsky</span>
   </div>
 </header>
 
@@ -502,8 +513,8 @@
       <div class="chart-wrap"><canvas id="chart-lat-bar"></canvas></div>
     </div>
     <div class="chart-card">
-      <div class="chart-title">Overall Distribution</div>
-      <div class="chart-subtitle">Download speed spread (all readings)</div>
+      <div class="chart-title">Speed Distribution</div>
+      <div class="chart-subtitle">Download speed frequency by range (Mbps)</div>
       <div class="chart-wrap"><canvas id="chart-scatter"></canvas></div>
     </div>
   </div>
@@ -935,16 +946,36 @@ function initOverview() {
     options: chartDefaults
   });
 
-  // Scatter all readings
+  // Histogram of download speeds
+  const binSize = 25;
+  const wifiDl = filter('Wi-Fi').map(r => r.dl);
+  const cellDl = filter('Cellular').map(r => r.dl);
+  const maxDl = Math.ceil(Math.max(...wifiDl, ...cellDl) / binSize) * binSize;
+  const binLabels = [];
+  const wifiCounts = [];
+  const cellCounts = [];
+  for (let b = 0; b < maxDl; b += binSize) {
+    binLabels.push(`${b}–${b + binSize}`);
+    wifiCounts.push(wifiDl.filter(v => v >= b && v < b + binSize).length);
+    cellCounts.push(cellDl.filter(v => v >= b && v < b + binSize).length);
+  }
   new Chart(document.getElementById('chart-scatter'), {
-    type: 'scatter',
+    type: 'bar',
     data: {
+      labels: binLabels,
       datasets: [
-        { label: 'Wi-Fi', data: filter('Wi-Fi').map((r,i)=>({x:i+1,y:r.dl})), backgroundColor: 'rgba(0,229,255,0.5)', pointRadius: 4 },
-        { label: '5G Cellular', data: filter('Cellular').map((r,i)=>({x:i+1,y:r.dl})), backgroundColor: 'rgba(255,107,53,0.5)', pointRadius: 4 }
+        { label: 'Wi-Fi', data: wifiCounts, backgroundColor: WIFI_COLOR, borderColor: WIFI_BORDER, borderWidth: 1 },
+        { label: '5G Cellular', data: cellCounts, backgroundColor: CELL_COLOR, borderColor: CELL_BORDER, borderWidth: 1 }
       ]
     },
-    options: { ...chartDefaults, scales: { ...chartDefaults.scales, x: { ...chartDefaults.scales.x, title: { display: true, text: 'Measurement index', color: '#6b7a99', font:{size:10} } }, y: { ...chartDefaults.scales.y, title: { display: true, text: 'Download (Mbps)', color: '#6b7a99', font:{size:10} } } } }
+    options: {
+      ...chartDefaults,
+      scales: {
+        ...chartDefaults.scales,
+        x: { ...chartDefaults.scales.x, title: { display: true, text: 'Download Speed (Mbps)', color: '#6b7a99', font: { size: 10 } } },
+        y: { ...chartDefaults.scales.y, title: { display: true, text: 'Number of Readings', color: '#6b7a99', font: { size: 10 } }, beginAtZero: true, ticks: { ...chartDefaults.scales.y.ticks, stepSize: 2 } }
+      }
+    }
   });
 }
 
