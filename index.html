@@ -1,0 +1,1278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Wi-Fi vs. 5G — Columbia Campus Study</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=DM+Sans:wght@300;400;500;600&display=swap');
+
+  :root {
+    --wifi: #00e5ff;
+    --cell: #ff6b35;
+    --bg: #0a0e1a;
+    --surface: #111827;
+    --surface2: #1a2235;
+    --border: rgba(255,255,255,0.07);
+    --text: #e8edf5;
+    --muted: #6b7a99;
+    --green: #00ffaa;
+    --yellow: #ffe566;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Noise overlay */
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.035'/%3E%3C/svg%3E");
+    pointer-events: none; z-index: 0;
+  }
+
+  header {
+    padding: 48px 48px 32px;
+    border-bottom: 1px solid var(--border);
+    position: relative;
+  }
+
+  .header-eyebrow {
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 12px;
+  }
+
+  h1 {
+    font-family: 'Space Mono', monospace;
+    font-size: clamp(22px, 3vw, 36px);
+    font-weight: 700;
+    line-height: 1.1;
+    letter-spacing: -0.02em;
+  }
+
+  h1 span.wifi { color: var(--wifi); }
+  h1 span.cell { color: var(--cell); }
+
+  .header-meta {
+    margin-top: 16px;
+    display: flex;
+    gap: 32px;
+    flex-wrap: wrap;
+  }
+
+  .meta-pill {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 6px 14px;
+    font-size: 12px;
+    color: var(--muted);
+    font-family: 'Space Mono', monospace;
+  }
+
+  .legend {
+    display: flex;
+    gap: 24px;
+    margin-top: 16px;
+  }
+
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    font-weight: 500;
+  }
+
+  .legend-dot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+  }
+
+  /* Nav tabs */
+  .tabs {
+    display: flex;
+    gap: 4px;
+    padding: 20px 48px 0;
+    border-bottom: 1px solid var(--border);
+    overflow-x: auto;
+  }
+
+  .tab {
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 10px 20px;
+    border-radius: 6px 6px 0 0;
+    cursor: pointer;
+    color: var(--muted);
+    border: 1px solid transparent;
+    border-bottom: none;
+    transition: all 0.2s;
+    white-space: nowrap;
+    background: transparent;
+  }
+
+  .tab.active {
+    color: var(--text);
+    background: var(--surface);
+    border-color: var(--border);
+    border-bottom-color: var(--surface);
+    margin-bottom: -1px;
+  }
+
+  .tab:hover:not(.active) { color: var(--text); }
+
+  /* Panels */
+  .panel { display: none; padding: 40px 48px; }
+  .panel.active { display: block; }
+
+  /* Stat cards */
+  .stat-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 16px;
+    margin-bottom: 40px;
+  }
+
+  .stat-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .stat-card::after {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+  }
+  .stat-card.wifi-card::after { background: var(--wifi); }
+  .stat-card.cell-card::after { background: var(--cell); }
+  .stat-card.neutral::after { background: linear-gradient(90deg, var(--wifi), var(--cell)); }
+
+  .stat-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 8px;
+  }
+
+  .stat-value {
+    font-family: 'Space Mono', monospace;
+    font-size: 28px;
+    font-weight: 700;
+    line-height: 1;
+  }
+
+  .stat-value.wifi-val { color: var(--wifi); }
+  .stat-value.cell-val { color: var(--cell); }
+
+  .stat-sub {
+    font-size: 12px;
+    color: var(--muted);
+    margin-top: 6px;
+  }
+
+  /* Charts */
+  .chart-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
+    gap: 24px;
+    margin-bottom: 32px;
+  }
+
+  .chart-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 28px;
+  }
+
+  .chart-title {
+    font-family: 'Space Mono', monospace;
+    font-size: 12px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 4px;
+  }
+
+  .chart-subtitle {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 20px;
+  }
+
+  .chart-wrap {
+    position: relative;
+    height: 260px;
+  }
+
+  /* Campus map */
+  .campus-section {
+    display: grid;
+    grid-template-columns: 1fr 1.4fr;
+    gap: 24px;
+    margin-bottom: 32px;
+  }
+
+  @media (max-width: 900px) {
+    .campus-section { grid-template-columns: 1fr; }
+    .panel { padding: 24px 20px; }
+    .tabs { padding: 16px 20px 0; }
+    header { padding: 32px 20px 24px; }
+  }
+
+  .campus-map-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 28px;
+  }
+
+  svg.campus { width: 100%; height: auto; }
+
+  .quadrant-info {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 28px;
+  }
+
+  .q-selector {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 20px;
+  }
+
+  .q-btn {
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    padding: 6px 14px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: var(--surface2);
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .q-btn.active, .q-btn:hover {
+    background: var(--surface2);
+    border-color: var(--wifi);
+    color: var(--wifi);
+  }
+
+  .q-detail-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+
+  .q-detail-table th {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    text-align: left;
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .q-detail-table td {
+    padding: 10px 10px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .q-detail-table tr:last-child td { border-bottom: none; }
+
+  .badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+  }
+
+  .badge-wifi { background: rgba(0,229,255,0.12); color: var(--wifi); }
+  .badge-cell { background: rgba(255,107,53,0.12); color: var(--cell); }
+  .badge-win { background: rgba(0,255,170,0.12); color: var(--green); }
+
+  /* Winner highlight row */
+  .win-row td:first-child { color: var(--green); font-weight: 600; }
+
+  /* Scatter */
+  .full-chart {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 28px;
+    margin-bottom: 24px;
+  }
+
+  .full-chart .chart-wrap { height: 320px; }
+
+  /* Insight cards */
+  .insights {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 16px;
+  }
+
+  .insight-card {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    border-left: 3px solid var(--wifi);
+  }
+
+  .insight-card.orange { border-left-color: var(--cell); }
+  .insight-card.green { border-left-color: var(--green); }
+  .insight-card.yellow { border-left-color: var(--yellow); }
+
+  .insight-title {
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 8px;
+  }
+
+  .insight-text {
+    font-size: 13px;
+    line-height: 1.6;
+    color: var(--text);
+  }
+
+  .insight-text strong { color: var(--wifi); }
+  .insight-card.orange .insight-text strong { color: var(--cell); }
+  .insight-card.green .insight-text strong { color: var(--green); }
+  .insight-card.yellow .insight-text strong { color: var(--yellow); }
+
+  /* AM/PM comparison */
+  .time-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+
+  @media (max-width: 700px) {
+    .time-grid { grid-template-columns: 1fr; }
+    .chart-grid { grid-template-columns: 1fr; }
+  }
+
+  /* Reliability panel */
+  .variance-table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  .variance-table th {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    text-align: left;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface2);
+  }
+
+  .variance-table td {
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--border);
+    font-size: 13px;
+  }
+
+  .bar-bg {
+    background: var(--surface2);
+    border-radius: 3px;
+    height: 8px;
+    overflow: hidden;
+    margin-top: 4px;
+  }
+
+  .bar-fill {
+    height: 100%;
+    border-radius: 3px;
+    transition: width 0.6s ease;
+  }
+
+  .bar-wifi { background: var(--wifi); }
+  .bar-cell { background: var(--cell); }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-eyebrow">COMS 4419 — Measurement Study — Columbia Morningside Heights</div>
+  <h1><span class="wifi">Wi-Fi</span> vs. <span class="cell">5G Cellular</span><br>Campus Network Performance</h1>
+  <div class="legend">
+    <div class="legend-item"><div class="legend-dot" style="background:var(--wifi)"></div> Columbia Wi-Fi</div>
+    <div class="legend-item"><div class="legend-dot" style="background:var(--cell)"></div> 5G Cellular</div>
+  </div>
+  <div class="header-meta">
+    <span class="meta-pill">144 measurements</span>
+    <span class="meta-pill">6 quadrants</span>
+    <span class="meta-pill">AM + PM sessions</span>
+    <span class="meta-pill">Indoor + Outdoor</span>
+    <span class="meta-pill">Alexa Kafka &amp; Theo Zaritsky</span>
+  </div>
+</header>
+
+<div class="tabs">
+  <div class="tab active" onclick="switchTab('overview')">Overview</div>
+  <div class="tab" onclick="switchTab('campus')">Campus Map</div>
+  <div class="tab" onclick="switchTab('environment')">Indoor vs Outdoor</div>
+  <div class="tab" onclick="switchTab('time')">AM vs PM</div>
+  <div class="tab" onclick="switchTab('reliability')">Reliability</div>
+  <div class="tab" onclick="switchTab('insights')">Findings</div>
+</div>
+
+<!-- OVERVIEW -->
+<div class="panel active" id="tab-overview">
+  <div class="stat-row">
+    <div class="stat-card wifi-card">
+      <div class="stat-label">Avg Wi-Fi Download</div>
+      <div class="stat-value wifi-val" id="avg-wifi-dl">—</div>
+      <div class="stat-sub">Mbps</div>
+    </div>
+    <div class="stat-card cell-card">
+      <div class="stat-label">Avg 5G Download</div>
+      <div class="stat-value cell-val" id="avg-cell-dl">—</div>
+      <div class="stat-sub">Mbps</div>
+    </div>
+    <div class="stat-card wifi-card">
+      <div class="stat-label">Avg Wi-Fi Latency</div>
+      <div class="stat-value wifi-val" id="avg-wifi-lat">—</div>
+      <div class="stat-sub">ms (lower = better)</div>
+    </div>
+    <div class="stat-card cell-card">
+      <div class="stat-label">Avg 5G Latency</div>
+      <div class="stat-value cell-val" id="avg-cell-lat">—</div>
+      <div class="stat-sub">ms (lower = better)</div>
+    </div>
+    <div class="stat-card neutral">
+      <div class="stat-label">Total Tests</div>
+      <div class="stat-value" style="color:var(--text)">144</div>
+      <div class="stat-sub">3 reps × 2 times × 2 env × 6 quad</div>
+    </div>
+  </div>
+
+  <div class="chart-grid">
+    <div class="chart-card">
+      <div class="chart-title">Download Speed</div>
+      <div class="chart-subtitle">Wi-Fi vs. 5G by Quadrant (avg Mbps)</div>
+      <div class="chart-wrap"><canvas id="chart-dl-bar"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Upload Speed</div>
+      <div class="chart-subtitle">Wi-Fi vs. 5G by Quadrant (avg Mbps)</div>
+      <div class="chart-wrap"><canvas id="chart-ul-bar"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Latency</div>
+      <div class="chart-subtitle">Wi-Fi vs. 5G by Quadrant (avg ms)</div>
+      <div class="chart-wrap"><canvas id="chart-lat-bar"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Overall Distribution</div>
+      <div class="chart-subtitle">Download speed spread (all readings)</div>
+      <div class="chart-wrap"><canvas id="chart-scatter"></canvas></div>
+    </div>
+  </div>
+</div>
+
+<!-- CAMPUS MAP -->
+<div class="panel" id="tab-campus">
+  <div class="campus-section">
+    <div class="campus-map-card">
+      <div class="chart-title">Campus Map</div>
+      <div class="chart-subtitle" style="margin-bottom:16px">Click a quadrant to explore</div>
+      <svg class="campus" viewBox="0 0 340 420" xmlns="http://www.w3.org/2000/svg">
+        <!-- Streets -->
+        <rect x="0" y="0" width="340" height="420" fill="#0d1322"/>
+        <text x="170" y="16" text-anchor="middle" fill="#6b7a99" font-size="10" font-family="Space Mono">120th STREET</text>
+        <text x="170" y="414" text-anchor="middle" fill="#6b7a99" font-size="10" font-family="Space Mono">114th STREET</text>
+        <text x="12" y="220" text-anchor="middle" fill="#6b7a99" font-size="9" font-family="Space Mono" transform="rotate(-90,12,220)">BROADWAY</text>
+        <text x="328" y="220" text-anchor="middle" fill="#6b7a99" font-size="9" font-family="Space Mono" transform="rotate(90,328,220)">AMSTERDAM AVE</text>
+        <!-- College Walk -->
+        <rect x="30" y="238" width="280" height="18" fill="#1a2235" rx="2"/>
+        <text x="170" y="251" text-anchor="middle" fill="#6b7a99" font-size="9" font-family="Space Mono">COLLEGE WALK</text>
+
+        <!-- Q1 -->
+        <rect id="map-q1" class="q-rect" x="32" y="25" width="130" height="110" rx="6" fill="rgba(0,229,255,0.08)" stroke="rgba(0,229,255,0.3)" stroke-width="1.5" cursor="pointer" onclick="selectQ('Q1')"/>
+        <text x="97" y="75" text-anchor="middle" fill="#00e5ff" font-size="28" font-weight="700" font-family="Space Mono" pointer-events="none">Q1</text>
+        <text x="97" y="95" text-anchor="middle" fill="#6b7a99" font-size="9" font-family="Space Mono" pointer-events="none">Pupin / Shapiro</text>
+
+        <!-- Q2 -->
+        <rect id="map-q2" class="q-rect" x="178" y="25" width="130" height="110" rx="6" fill="rgba(255,107,53,0.08)" stroke="rgba(255,107,53,0.3)" stroke-width="1.5" cursor="pointer" onclick="selectQ('Q2')"/>
+        <text x="243" y="75" text-anchor="middle" fill="#ff6b35" font-size="28" font-weight="700" font-family="Space Mono" pointer-events="none">Q2</text>
+        <text x="243" y="95" text-anchor="middle" fill="#6b7a99" font-size="9" font-family="Space Mono" pointer-events="none">Mudd</text>
+
+        <!-- Q3 -->
+        <rect id="map-q3" class="q-rect" x="32" y="145" width="130" height="88" rx="6" fill="rgba(0,229,255,0.08)" stroke="rgba(0,229,255,0.3)" stroke-width="1.5" cursor="pointer" onclick="selectQ('Q3')"/>
+        <text x="97" y="192" text-anchor="middle" fill="#00e5ff" font-size="28" font-weight="700" font-family="Space Mono" pointer-events="none">Q3</text>
+        <text x="97" y="210" text-anchor="middle" fill="#6b7a99" font-size="9" font-family="Space Mono" pointer-events="none">Earl / Low Library</text>
+
+        <!-- Q4 -->
+        <rect id="map-q4" class="q-rect" x="178" y="145" width="130" height="88" rx="6" fill="rgba(255,107,53,0.08)" stroke="rgba(255,107,53,0.3)" stroke-width="1.5" cursor="pointer" onclick="selectQ('Q4')"/>
+        <text x="243" y="192" text-anchor="middle" fill="#ff6b35" font-size="28" font-weight="700" font-family="Space Mono" pointer-events="none">Q4</text>
+        <text x="243" y="210" text-anchor="middle" fill="#6b7a99" font-size="9" font-family="Space Mono" pointer-events="none">Avery Library</text>
+
+        <!-- Q5 -->
+        <rect id="map-q5" class="q-rect" x="32" y="262" width="130" height="130" rx="6" fill="rgba(0,229,255,0.08)" stroke="rgba(0,229,255,0.3)" stroke-width="1.5" cursor="pointer" onclick="selectQ('Q5')"/>
+        <text x="97" y="325" text-anchor="middle" fill="#00e5ff" font-size="28" font-weight="700" font-family="Space Mono" pointer-events="none">Q5</text>
+        <text x="97" y="345" text-anchor="middle" fill="#6b7a99" font-size="9" font-family="Space Mono" pointer-events="none">Lerner Hall</text>
+
+        <!-- Q6 -->
+        <rect id="map-q6" class="q-rect" x="178" y="262" width="130" height="130" rx="6" fill="rgba(255,107,53,0.08)" stroke="rgba(255,107,53,0.3)" stroke-width="1.5" cursor="pointer" onclick="selectQ('Q6')"/>
+        <text x="243" y="325" text-anchor="middle" fill="#ff6b35" font-size="28" font-weight="700" font-family="Space Mono" pointer-events="none">Q6</text>
+        <text x="243" y="345" text-anchor="middle" fill="#6b7a99" font-size="9" font-family="Space Mono" pointer-events="none">John Jay / Hamilton</text>
+      </svg>
+    </div>
+
+    <div class="quadrant-info">
+      <div class="q-selector" id="q-selector">
+        <button class="q-btn active" onclick="selectQ('Q1')">Q1</button>
+        <button class="q-btn" onclick="selectQ('Q2')">Q2</button>
+        <button class="q-btn" onclick="selectQ('Q3')">Q3</button>
+        <button class="q-btn" onclick="selectQ('Q4')">Q4</button>
+        <button class="q-btn" onclick="selectQ('Q5')">Q5</button>
+        <button class="q-btn" onclick="selectQ('Q6')">Q6</button>
+      </div>
+      <div id="q-detail-content"></div>
+      <div class="chart-wrap" style="margin-top:20px; height:220px"><canvas id="chart-quad-detail"></canvas></div>
+    </div>
+  </div>
+
+  <div class="full-chart">
+    <div class="chart-title">Heat Map — Download Speed Winner</div>
+    <div class="chart-subtitle">Who wins each condition? (Wi-Fi vs 5G, Indoor vs Outdoor, per quadrant)</div>
+    <div class="chart-wrap" style="height:280px"><canvas id="chart-heatmap"></canvas></div>
+  </div>
+</div>
+
+<!-- ENVIRONMENT -->
+<div class="panel" id="tab-environment">
+  <div class="stat-row">
+    <div class="stat-card wifi-card">
+      <div class="stat-label">Wi-Fi Indoor Avg DL</div>
+      <div class="stat-value wifi-val" id="wifi-in-dl">—</div>
+      <div class="stat-sub">Mbps</div>
+    </div>
+    <div class="stat-card wifi-card">
+      <div class="stat-label">Wi-Fi Outdoor Avg DL</div>
+      <div class="stat-value wifi-val" id="wifi-out-dl">—</div>
+      <div class="stat-sub">Mbps</div>
+    </div>
+    <div class="stat-card cell-card">
+      <div class="stat-label">5G Indoor Avg DL</div>
+      <div class="stat-value cell-val" id="cell-in-dl">—</div>
+      <div class="stat-sub">Mbps</div>
+    </div>
+    <div class="stat-card cell-card">
+      <div class="stat-label">5G Outdoor Avg DL</div>
+      <div class="stat-value cell-val" id="cell-out-dl">—</div>
+      <div class="stat-sub">Mbps</div>
+    </div>
+  </div>
+
+  <div class="chart-grid">
+    <div class="chart-card">
+      <div class="chart-title">Download Speed</div>
+      <div class="chart-subtitle">Indoor vs Outdoor by Network</div>
+      <div class="chart-wrap"><canvas id="chart-env-dl"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Upload Speed</div>
+      <div class="chart-subtitle">Indoor vs Outdoor by Network</div>
+      <div class="chart-wrap"><canvas id="chart-env-ul"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Latency</div>
+      <div class="chart-subtitle">Indoor vs Outdoor by Network</div>
+      <div class="chart-wrap"><canvas id="chart-env-lat"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Environment Delta</div>
+      <div class="chart-subtitle">Indoor–Outdoor download difference (Mbps)</div>
+      <div class="chart-wrap"><canvas id="chart-env-delta"></canvas></div>
+    </div>
+  </div>
+</div>
+
+<!-- TIME -->
+<div class="panel" id="tab-time">
+  <div class="stat-row">
+    <div class="stat-card wifi-card">
+      <div class="stat-label">Wi-Fi AM Avg DL</div>
+      <div class="stat-value wifi-val" id="wifi-am-dl">—</div>
+      <div class="stat-sub">Mbps</div>
+    </div>
+    <div class="stat-card wifi-card">
+      <div class="stat-label">Wi-Fi PM Avg DL</div>
+      <div class="stat-value wifi-val" id="wifi-pm-dl">—</div>
+      <div class="stat-sub">Mbps</div>
+    </div>
+    <div class="stat-card cell-card">
+      <div class="stat-label">5G AM Avg DL</div>
+      <div class="stat-value cell-val" id="cell-am-dl">—</div>
+      <div class="stat-sub">Mbps</div>
+    </div>
+    <div class="stat-card cell-card">
+      <div class="stat-label">5G PM Avg DL</div>
+      <div class="stat-value cell-val" id="cell-pm-dl">—</div>
+      <div class="stat-sub">Mbps</div>
+    </div>
+  </div>
+  <div class="chart-grid">
+    <div class="chart-card">
+      <div class="chart-title">Download Speed</div>
+      <div class="chart-subtitle">AM vs PM by Network</div>
+      <div class="chart-wrap"><canvas id="chart-time-dl"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Latency</div>
+      <div class="chart-subtitle">AM vs PM by Network</div>
+      <div class="chart-wrap"><canvas id="chart-time-lat"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">AM Download</div>
+      <div class="chart-subtitle">Wi-Fi vs 5G per quadrant (morning)</div>
+      <div class="chart-wrap"><canvas id="chart-am-quad"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">PM Download</div>
+      <div class="chart-subtitle">Wi-Fi vs 5G per quadrant (evening)</div>
+      <div class="chart-wrap"><canvas id="chart-pm-quad"></canvas></div>
+    </div>
+  </div>
+</div>
+
+<!-- RELIABILITY -->
+<div class="panel" id="tab-reliability">
+  <div class="chart-grid">
+    <div class="chart-card">
+      <div class="chart-title">Coefficient of Variation</div>
+      <div class="chart-subtitle">Download speed consistency per quadrant</div>
+      <div class="chart-wrap"><canvas id="chart-cv"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Standard Deviation</div>
+      <div class="chart-subtitle">Wi-Fi vs 5G download spread (Mbps)</div>
+      <div class="chart-wrap"><canvas id="chart-std"></canvas></div>
+    </div>
+  </div>
+
+  <div class="full-chart">
+    <div class="chart-title">All Observations — Download Speed</div>
+    <div class="chart-subtitle">Every individual measurement plotted (144 data points)</div>
+    <div class="chart-wrap"><canvas id="chart-all-scatter"></canvas></div>
+  </div>
+
+  <div style="background:var(--surface); border:1px solid var(--border); border-radius:16px; padding:28px; overflow-x:auto;">
+    <div class="chart-title">Reliability Summary</div>
+    <div class="chart-subtitle" style="margin-bottom:20px">Standard deviation and range per network + quadrant</div>
+    <table class="variance-table" id="reliability-table"></table>
+  </div>
+</div>
+
+<!-- FINDINGS -->
+<div class="panel" id="tab-insights">
+  <div class="insights" id="insights-container"></div>
+</div>
+
+<script>
+// =================== DATA ===================
+const raw = [
+  {q:"Q1",loc:"Pupin lobby",net:"Wi-Fi",env:"Inside",time:"10:51 a.m.",rep:1,dl:155.41,ul:143.73,lat:5.07},
+  {q:"Q1",loc:"Pupin lobby",net:"Wi-Fi",env:"Inside",time:"10:51 a.m.",rep:2,dl:156.22,ul:136.14,lat:5.46},
+  {q:"Q1",loc:"Pupin lobby",net:"Wi-Fi",env:"Inside",time:"10:52 a.m.",rep:3,dl:147.01,ul:154.01,lat:4.92},
+  {q:"Q1",loc:"Pupin lobby",net:"Cellular",env:"Inside",time:"10:53 a.m.",rep:1,dl:7.85,ul:20.01,lat:46.47},
+  {q:"Q1",loc:"Pupin lobby",net:"Cellular",env:"Inside",time:"10:54 a.m.",rep:2,dl:6.23,ul:24.57,lat:41.7},
+  {q:"Q1",loc:"Pupin lobby",net:"Cellular",env:"Inside",time:"10:54 a.m.",rep:3,dl:8.35,ul:20.07,lat:46.36},
+  {q:"Q1",loc:"Shapiro entrance",net:"Wi-Fi",env:"Outside",time:"10:57 a.m.",rep:1,dl:72.39,ul:80.45,lat:7.66},
+  {q:"Q1",loc:"Shapiro entrance",net:"Wi-Fi",env:"Outside",time:"10:57 a.m.",rep:2,dl:86.69,ul:85.87,lat:8.04},
+  {q:"Q1",loc:"Shapiro entrance",net:"Wi-Fi",env:"Outside",time:"10:58 a.m.",rep:3,dl:72.6,ul:74.31,lat:8.03},
+  {q:"Q1",loc:"Shapiro entrance",net:"Cellular",env:"Outside",time:"11:00 a.m.",rep:1,dl:25.6,ul:37.15,lat:43.72},
+  {q:"Q1",loc:"Shapiro entrance",net:"Cellular",env:"Outside",time:"11:01 a.m.",rep:2,dl:20.76,ul:42.64,lat:46.05},
+  {q:"Q1",loc:"Shapiro entrance",net:"Cellular",env:"Outside",time:"11:01 a.m.",rep:3,dl:27.4,ul:41.33,lat:44.94},
+  {q:"Q1",loc:"Pupin lobby",net:"Wi-Fi",env:"Inside",time:"5:12 p.m.",rep:1,dl:115.19,ul:133.74,lat:5.53},
+  {q:"Q1",loc:"Pupin lobby",net:"Wi-Fi",env:"Inside",time:"5:13 p.m.",rep:2,dl:136.22,ul:136.23,lat:5.58},
+  {q:"Q1",loc:"Pupin lobby",net:"Wi-Fi",env:"Inside",time:"5:14 p.m.",rep:3,dl:125.91,ul:143.97,lat:6.42},
+  {q:"Q1",loc:"Pupin lobby",net:"Cellular",env:"Inside",time:"5:14 p.m.",rep:1,dl:5.7,ul:21.93,lat:47.01},
+  {q:"Q1",loc:"Pupin lobby",net:"Cellular",env:"Inside",time:"5:15 p.m.",rep:2,dl:7.42,ul:22.27,lat:52.63},
+  {q:"Q1",loc:"Pupin lobby",net:"Cellular",env:"Inside",time:"5:15 p.m.",rep:3,dl:7.66,ul:18.28,lat:48.33},
+  {q:"Q1",loc:"Shapiro entrance",net:"Wi-Fi",env:"Outside",time:"5:17 p.m.",rep:1,dl:69.81,ul:81.97,lat:11.35},
+  {q:"Q1",loc:"Shapiro entrance",net:"Wi-Fi",env:"Outside",time:"5:18 p.m.",rep:2,dl:67.96,ul:86.76,lat:8.62},
+  {q:"Q1",loc:"Shapiro entrance",net:"Wi-Fi",env:"Outside",time:"5:19 p.m.",rep:3,dl:70.31,ul:65.93,lat:9.82},
+  {q:"Q1",loc:"Shapiro entrance",net:"Cellular",env:"Outside",time:"5:22 p.m.",rep:1,dl:26.31,ul:29.5,lat:52.99},
+  {q:"Q1",loc:"Shapiro entrance",net:"Cellular",env:"Outside",time:"5:23 p.m.",rep:2,dl:25.57,ul:36.52,lat:44.01},
+  {q:"Q1",loc:"Shapiro entrance",net:"Cellular",env:"Outside",time:"5:23 p.m.",rep:3,dl:21.75,ul:36.56,lat:44.39},
+  {q:"Q2",loc:"Mudd lobby",net:"Wi-Fi",env:"Inside",time:"11:07 a.m.",rep:1,dl:121.42,ul:119.07,lat:6.07},
+  {q:"Q2",loc:"Mudd lobby",net:"Wi-Fi",env:"Inside",time:"11:07 a.m.",rep:2,dl:140.32,ul:145.42,lat:5.91},
+  {q:"Q2",loc:"Mudd lobby",net:"Wi-Fi",env:"Inside",time:"11:08 a.m.",rep:3,dl:129.91,ul:118.13,lat:5.47},
+  {q:"Q2",loc:"Mudd lobby",net:"Cellular",env:"Inside",time:"11:10 a.m.",rep:1,dl:7.38,ul:20.3,lat:40.67},
+  {q:"Q2",loc:"Mudd lobby",net:"Cellular",env:"Inside",time:"11:11 a.m.",rep:2,dl:5.55,ul:14.29,lat:46.99},
+  {q:"Q2",loc:"Mudd lobby",net:"Cellular",env:"Inside",time:"11:12 a.m.",rep:3,dl:5.81,ul:17.01,lat:43.83},
+  {q:"Q2",loc:"Mudd entrance",net:"Wi-Fi",env:"Outside",time:"11:14 a.m.",rep:1,dl:78.5,ul:66.62,lat:8.23},
+  {q:"Q2",loc:"Mudd entrance",net:"Wi-Fi",env:"Outside",time:"11:15 a.m.",rep:2,dl:76.14,ul:65.51,lat:7.91},
+  {q:"Q2",loc:"Mudd entrance",net:"Wi-Fi",env:"Outside",time:"11:15 a.m.",rep:3,dl:60.37,ul:85.08,lat:8.14},
+  {q:"Q2",loc:"Mudd entrance",net:"Cellular",env:"Outside",time:"11:18 a.m.",rep:1,dl:22.51,ul:32.71,lat:46.04},
+  {q:"Q2",loc:"Mudd entrance",net:"Cellular",env:"Outside",time:"11:18 a.m.",rep:2,dl:24.41,ul:35.44,lat:41.91},
+  {q:"Q2",loc:"Mudd entrance",net:"Cellular",env:"Outside",time:"11:19 a.m.",rep:3,dl:20.41,ul:38.38,lat:38.67},
+  {q:"Q2",loc:"Mudd lobby",net:"Wi-Fi",env:"Inside",time:"5:26 p.m.",rep:1,dl:115.57,ul:112.96,lat:5.9},
+  {q:"Q2",loc:"Mudd lobby",net:"Wi-Fi",env:"Inside",time:"5:28 p.m.",rep:2,dl:111.04,ul:109.94,lat:6.5},
+  {q:"Q2",loc:"Mudd lobby",net:"Wi-Fi",env:"Inside",time:"5:28 p.m.",rep:3,dl:100.72,ul:105.08,lat:5.64},
+  {q:"Q2",loc:"Mudd lobby",net:"Cellular",env:"Inside",time:"5:30 p.m.",rep:1,dl:5.06,ul:19.26,lat:50.68},
+  {q:"Q2",loc:"Mudd lobby",net:"Cellular",env:"Inside",time:"5:31 p.m.",rep:2,dl:6.32,ul:18.46,lat:47.89},
+  {q:"Q2",loc:"Mudd lobby",net:"Cellular",env:"Inside",time:"5:31 p.m.",rep:3,dl:6.91,ul:15.26,lat:50.28},
+  {q:"Q2",loc:"Mudd entrance",net:"Wi-Fi",env:"Outside",time:"5:34 p.m.",rep:1,dl:61.73,ul:71.26,lat:11.35},
+  {q:"Q2",loc:"Mudd entrance",net:"Wi-Fi",env:"Outside",time:"5:35 p.m.",rep:2,dl:56.26,ul:73.95,lat:10.08},
+  {q:"Q2",loc:"Mudd entrance",net:"Wi-Fi",env:"Outside",time:"5:36 p.m.",rep:3,dl:57.32,ul:74.68,lat:11.74},
+  {q:"Q2",loc:"Mudd entrance",net:"Cellular",env:"Outside",time:"5:38 p.m.",rep:1,dl:22.64,ul:28.82,lat:52.3},
+  {q:"Q2",loc:"Mudd entrance",net:"Cellular",env:"Outside",time:"5:38 p.m.",rep:2,dl:21.98,ul:35.99,lat:50.76},
+  {q:"Q2",loc:"Mudd entrance",net:"Cellular",env:"Outside",time:"5:39 p.m.",rep:3,dl:23.76,ul:30.54,lat:50.71},
+  {q:"Q3",loc:"Earl lobby",net:"Wi-Fi",env:"Inside",time:"11:24 a.m.",rep:1,dl:143.95,ul:140.32,lat:5.51},
+  {q:"Q3",loc:"Earl lobby",net:"Wi-Fi",env:"Inside",time:"11:25 a.m.",rep:2,dl:131.63,ul:151.84,lat:5.3},
+  {q:"Q3",loc:"Earl lobby",net:"Wi-Fi",env:"Inside",time:"11:27 a.m.",rep:3,dl:142.83,ul:141.57,lat:5.84},
+  {q:"Q3",loc:"Earl lobby",net:"Cellular",env:"Inside",time:"11:29 a.m.",rep:1,dl:6.64,ul:15,lat:45.23},
+  {q:"Q3",loc:"Earl lobby",net:"Cellular",env:"Inside",time:"11:30 a.m.",rep:2,dl:6.21,ul:17.67,lat:45.98},
+  {q:"Q3",loc:"Earl lobby",net:"Cellular",env:"Inside",time:"11:30 a.m.",rep:3,dl:5.97,ul:22.9,lat:44.63},
+  {q:"Q3",loc:"Outside Earl",net:"Wi-Fi",env:"Outside",time:"11:32 a.m.",rep:1,dl:75.76,ul:83.25,lat:7.56},
+  {q:"Q3",loc:"Outside Earl",net:"Wi-Fi",env:"Outside",time:"11:33 a.m.",rep:2,dl:63.73,ul:84.28,lat:9.28},
+  {q:"Q3",loc:"Outside Earl",net:"Wi-Fi",env:"Outside",time:"11:34 a.m.",rep:3,dl:77.51,ul:86.71,lat:8.26},
+  {q:"Q3",loc:"Outside Earl",net:"Cellular",env:"Outside",time:"11:37 a.m.",rep:1,dl:20.53,ul:42.19,lat:38.31},
+  {q:"Q3",loc:"Outside Earl",net:"Cellular",env:"Outside",time:"11:38 a.m.",rep:2,dl:23.9,ul:37.71,lat:45.82},
+  {q:"Q3",loc:"Outside Earl",net:"Cellular",env:"Outside",time:"11:38 a.m.",rep:3,dl:19.82,ul:38.73,lat:38.46},
+  {q:"Q3",loc:"Earl lobby",net:"Wi-Fi",env:"Inside",time:"5:42 p.m.",rep:1,dl:117.35,ul:129.17,lat:6.99},
+  {q:"Q3",loc:"Earl lobby",net:"Wi-Fi",env:"Inside",time:"5:43 p.m.",rep:2,dl:105.77,ul:133.04,lat:5.66},
+  {q:"Q3",loc:"Earl lobby",net:"Wi-Fi",env:"Inside",time:"5:43 p.m.",rep:3,dl:115.95,ul:140.05,lat:6.99},
+  {q:"Q3",loc:"Earl lobby",net:"Cellular",env:"Inside",time:"5:45 p.m.",rep:1,dl:5.31,ul:12.86,lat:46.81},
+  {q:"Q3",loc:"Earl lobby",net:"Cellular",env:"Inside",time:"5:46 p.m.",rep:2,dl:6.9,ul:13.15,lat:52.91},
+  {q:"Q3",loc:"Earl lobby",net:"Cellular",env:"Inside",time:"5:46 p.m.",rep:3,dl:6.96,ul:19.82,lat:54.14},
+  {q:"Q3",loc:"Outside Earl",net:"Wi-Fi",env:"Outside",time:"5:48 p.m.",rep:1,dl:68.09,ul:78.08,lat:10.51},
+  {q:"Q3",loc:"Outside Earl",net:"Wi-Fi",env:"Outside",time:"5:48 p.m.",rep:2,dl:68.78,ul:61.96,lat:10.54},
+  {q:"Q3",loc:"Outside Earl",net:"Wi-Fi",env:"Outside",time:"5:49 p.m.",rep:3,dl:75.1,ul:68.76,lat:11.15},
+  {q:"Q3",loc:"Outside Earl",net:"Cellular",env:"Outside",time:"5:55 p.m.",rep:1,dl:18.21,ul:32.28,lat:48.7},
+  {q:"Q3",loc:"Outside Earl",net:"Cellular",env:"Outside",time:"5:55 p.m.",rep:2,dl:23.15,ul:30.41,lat:48},
+  {q:"Q3",loc:"Outside Earl",net:"Cellular",env:"Outside",time:"5:57 p.m.",rep:3,dl:18.31,ul:33.4,lat:52.55},
+  {q:"Q4",loc:"Avery Library",net:"Wi-Fi",env:"Inside",time:"9:14 a.m.",rep:1,dl:107.02,ul:177.59,lat:6},
+  {q:"Q4",loc:"Avery Library",net:"Wi-Fi",env:"Inside",time:"9:14 a.m.",rep:2,dl:169.39,ul:170.82,lat:6},
+  {q:"Q4",loc:"Avery Library",net:"Wi-Fi",env:"Inside",time:"9:15 a.m.",rep:3,dl:164.59,ul:178.35,lat:6},
+  {q:"Q4",loc:"Avery Library",net:"Cellular",env:"Inside",time:"9:16 a.m.",rep:1,dl:33.4,ul:4.75,lat:27},
+  {q:"Q4",loc:"Avery Library",net:"Cellular",env:"Inside",time:"9:17 a.m.",rep:2,dl:59.5,ul:4.3,lat:30},
+  {q:"Q4",loc:"Avery Library",net:"Cellular",env:"Inside",time:"9:18 a.m.",rep:3,dl:49.2,ul:16,lat:28},
+  {q:"Q4",loc:"Outside Avery",net:"Wi-Fi",env:"Outside",time:"9:09 a.m.",rep:1,dl:55.99,ul:50.36,lat:6},
+  {q:"Q4",loc:"Outside Avery",net:"Wi-Fi",env:"Outside",time:"9:10 a.m.",rep:2,dl:44.36,ul:63.1,lat:7},
+  {q:"Q4",loc:"Outside Avery",net:"Wi-Fi",env:"Outside",time:"9:11 a.m.",rep:3,dl:52.42,ul:58.79,lat:7},
+  {q:"Q4",loc:"Outside Avery",net:"Cellular",env:"Outside",time:"9:12 a.m.",rep:1,dl:81.3,ul:38.1,lat:30},
+  {q:"Q4",loc:"Outside Avery",net:"Cellular",env:"Outside",time:"9:13 a.m.",rep:2,dl:79.5,ul:50.1,lat:30},
+  {q:"Q4",loc:"Outside Avery",net:"Cellular",env:"Outside",time:"9:14 a.m.",rep:3,dl:83.4,ul:45.3,lat:29},
+  {q:"Q4",loc:"Avery Library",net:"Wi-Fi",env:"Inside",time:"5:40 p.m.",rep:1,dl:83.9,ul:130.09,lat:17},
+  {q:"Q4",loc:"Avery Library",net:"Wi-Fi",env:"Inside",time:"5:43 p.m.",rep:2,dl:115.32,ul:151.01,lat:6},
+  {q:"Q4",loc:"Avery Library",net:"Wi-Fi",env:"Inside",time:"5:43 p.m.",rep:3,dl:136.9,ul:142.61,lat:7},
+  {q:"Q4",loc:"Avery Library",net:"Cellular",env:"Inside",time:"5:44 p.m.",rep:1,dl:31.2,ul:2.53,lat:31},
+  {q:"Q4",loc:"Avery Library",net:"Cellular",env:"Inside",time:"5:45 p.m.",rep:2,dl:61.4,ul:2.42,lat:31},
+  {q:"Q4",loc:"Avery Library",net:"Cellular",env:"Inside",time:"5:45 p.m.",rep:3,dl:47.6,ul:18,lat:29},
+  {q:"Q4",loc:"Outside Avery",net:"Wi-Fi",env:"Outside",time:"5:47 p.m.",rep:1,dl:51.48,ul:30.03,lat:9},
+  {q:"Q4",loc:"Outside Avery",net:"Wi-Fi",env:"Outside",time:"5:48 p.m.",rep:2,dl:27.48,ul:41.11,lat:10},
+  {q:"Q4",loc:"Outside Avery",net:"Wi-Fi",env:"Outside",time:"5:48 p.m.",rep:3,dl:32.78,ul:46.97,lat:8},
+  {q:"Q4",loc:"Outside Avery",net:"Cellular",env:"Outside",time:"5:49 p.m.",rep:1,dl:85.8,ul:41.2,lat:32},
+  {q:"Q4",loc:"Outside Avery",net:"Cellular",env:"Outside",time:"5:50 p.m.",rep:2,dl:46.1,ul:45.7,lat:36},
+  {q:"Q4",loc:"Outside Avery",net:"Cellular",env:"Outside",time:"5:50 p.m.",rep:3,dl:91.6,ul:43.1,lat:35},
+  {q:"Q5",loc:"Lerner Hall",net:"Wi-Fi",env:"Inside",time:"8:39 a.m.",rep:1,dl:108.35,ul:147.86,lat:5},
+  {q:"Q5",loc:"Lerner Hall",net:"Wi-Fi",env:"Inside",time:"8:40 a.m.",rep:2,dl:112.48,ul:142.98,lat:5},
+  {q:"Q5",loc:"Lerner Hall",net:"Wi-Fi",env:"Inside",time:"8:41 a.m.",rep:3,dl:104.63,ul:147.36,lat:7},
+  {q:"Q5",loc:"Lerner Hall",net:"Cellular",env:"Inside",time:"8:42 a.m.",rep:1,dl:181,ul:46,lat:35},
+  {q:"Q5",loc:"Lerner Hall",net:"Cellular",env:"Inside",time:"8:44 a.m.",rep:2,dl:189,ul:49.4,lat:39},
+  {q:"Q5",loc:"Lerner Hall",net:"Cellular",env:"Inside",time:"8:44 a.m.",rep:3,dl:209,ul:45,lat:37},
+  {q:"Q5",loc:"Outside Lerner",net:"Wi-Fi",env:"Outside",time:"8:46 a.m.",rep:1,dl:46.12,ul:46.31,lat:6},
+  {q:"Q5",loc:"Outside Lerner",net:"Wi-Fi",env:"Outside",time:"8:48 a.m.",rep:2,dl:29.09,ul:53.03,lat:8},
+  {q:"Q5",loc:"Outside Lerner",net:"Wi-Fi",env:"Outside",time:"8:50 a.m.",rep:3,dl:15.56,ul:44.53,lat:7},
+  {q:"Q5",loc:"Outside Lerner",net:"Cellular",env:"Outside",time:"8:51 a.m.",rep:1,dl:75.5,ul:49.7,lat:31},
+  {q:"Q5",loc:"Outside Lerner",net:"Cellular",env:"Outside",time:"8:52 a.m.",rep:2,dl:90.4,ul:47.9,lat:39},
+  {q:"Q5",loc:"Outside Lerner",net:"Cellular",env:"Outside",time:"8:52 a.m.",rep:3,dl:118,ul:48.7,lat:37},
+  {q:"Q5",loc:"Lerner Hall",net:"Wi-Fi",env:"Inside",time:"6:14 p.m.",rep:1,dl:87.93,ul:115.81,lat:7},
+  {q:"Q5",loc:"Lerner Hall",net:"Wi-Fi",env:"Inside",time:"6:14 p.m.",rep:2,dl:96.71,ul:127.92,lat:5},
+  {q:"Q5",loc:"Lerner Hall",net:"Wi-Fi",env:"Inside",time:"6:15 p.m.",rep:3,dl:111.77,ul:119.19,lat:6},
+  {q:"Q5",loc:"Lerner Hall",net:"Cellular",env:"Inside",time:"6:17 p.m.",rep:1,dl:168,ul:24.4,lat:37},
+  {q:"Q5",loc:"Lerner Hall",net:"Cellular",env:"Inside",time:"6:18 p.m.",rep:2,dl:164,ul:43.5,lat:41},
+  {q:"Q5",loc:"Lerner Hall",net:"Cellular",env:"Inside",time:"6:19 p.m.",rep:3,dl:178,ul:27.5,lat:36},
+  {q:"Q5",loc:"Outside Lerner",net:"Wi-Fi",env:"Outside",time:"6:09 p.m.",rep:1,dl:50.09,ul:58.64,lat:9},
+  {q:"Q5",loc:"Outside Lerner",net:"Wi-Fi",env:"Outside",time:"6:09 p.m.",rep:2,dl:30.75,ul:57.25,lat:11},
+  {q:"Q5",loc:"Outside Lerner",net:"Wi-Fi",env:"Outside",time:"6:10 p.m.",rep:3,dl:46.06,ul:50.04,lat:6},
+  {q:"Q5",loc:"Outside Lerner",net:"Cellular",env:"Outside",time:"6:12 p.m.",rep:1,dl:117,ul:51.4,lat:35},
+  {q:"Q5",loc:"Outside Lerner",net:"Cellular",env:"Outside",time:"6:12 p.m.",rep:2,dl:116,ul:45.2,lat:37},
+  {q:"Q5",loc:"Outside Lerner",net:"Cellular",env:"Outside",time:"6:13 p.m.",rep:3,dl:95.6,ul:24.8,lat:35},
+  {q:"Q6",loc:"John Jay",net:"Wi-Fi",env:"Inside",time:"8:49 a.m.",rep:1,dl:20.89,ul:22.03,lat:26},
+  {q:"Q6",loc:"John Jay",net:"Wi-Fi",env:"Inside",time:"8:50 a.m.",rep:2,dl:26.39,ul:47.3,lat:32},
+  {q:"Q6",loc:"John Jay",net:"Wi-Fi",env:"Inside",time:"8:50 a.m.",rep:3,dl:19.96,ul:48.55,lat:10},
+  {q:"Q6",loc:"John Jay",net:"Cellular",env:"Inside",time:"8:52 a.m.",rep:1,dl:92.3,ul:20.3,lat:25},
+  {q:"Q6",loc:"John Jay",net:"Cellular",env:"Inside",time:"8:52 a.m.",rep:2,dl:85.4,ul:14.5,lat:26},
+  {q:"Q6",loc:"John Jay",net:"Cellular",env:"Inside",time:"8:53 a.m.",rep:3,dl:77.4,ul:14,lat:25},
+  {q:"Q6",loc:"Outside John Jay",net:"Wi-Fi",env:"Outside",time:"9:01 a.m.",rep:1,dl:25.16,ul:56.37,lat:6},
+  {q:"Q6",loc:"Outside John Jay",net:"Wi-Fi",env:"Outside",time:"9:02 a.m.",rep:2,dl:19.86,ul:15.29,lat:8},
+  {q:"Q6",loc:"Outside John Jay",net:"Wi-Fi",env:"Outside",time:"9:03 a.m.",rep:3,dl:31.77,ul:44.84,lat:7},
+  {q:"Q6",loc:"Outside John Jay",net:"Cellular",env:"Outside",time:"9:04 a.m.",rep:1,dl:140,ul:35.2,lat:30},
+  {q:"Q6",loc:"Outside John Jay",net:"Cellular",env:"Outside",time:"9:05 a.m.",rep:2,dl:125,ul:35.1,lat:31},
+  {q:"Q6",loc:"Outside John Jay",net:"Cellular",env:"Outside",time:"9:06 a.m.",rep:3,dl:126,ul:33,lat:30},
+  {q:"Q6",loc:"John Jay",net:"Wi-Fi",env:"Inside",time:"6:01 p.m.",rep:1,dl:8.42,ul:38.35,lat:11},
+  {q:"Q6",loc:"John Jay",net:"Wi-Fi",env:"Inside",time:"6:04 p.m.",rep:2,dl:4.75,ul:12.91,lat:11},
+  {q:"Q6",loc:"John Jay",net:"Wi-Fi",env:"Inside",time:"6:05 p.m.",rep:3,dl:8.12,ul:34.16,lat:43},
+  {q:"Q6",loc:"John Jay",net:"Cellular",env:"Inside",time:"6:03 p.m.",rep:1,dl:80.7,ul:13.7,lat:28},
+  {q:"Q6",loc:"John Jay",net:"Cellular",env:"Inside",time:"6:03 p.m.",rep:2,dl:81.4,ul:11.6,lat:27},
+  {q:"Q6",loc:"John Jay",net:"Cellular",env:"Inside",time:"6:04 p.m.",rep:3,dl:72.2,ul:13.4,lat:30},
+  {q:"Q6",loc:"Outside John Jay",net:"Wi-Fi",env:"Outside",time:"5:55 p.m.",rep:1,dl:20.95,ul:18.85,lat:18},
+  {q:"Q6",loc:"Outside John Jay",net:"Wi-Fi",env:"Outside",time:"5:56 p.m.",rep:2,dl:12.08,ul:20.32,lat:6},
+  {q:"Q6",loc:"Outside John Jay",net:"Wi-Fi",env:"Outside",time:"5:56 p.m.",rep:3,dl:8.42,ul:22.72,lat:6},
+  {q:"Q6",loc:"Outside John Jay",net:"Cellular",env:"Outside",time:"5:58 p.m.",rep:1,dl:127,ul:30.1,lat:32},
+  {q:"Q6",loc:"Outside John Jay",net:"Cellular",env:"Outside",time:"5:58 p.m.",rep:2,dl:115,ul:36.7,lat:37},
+  {q:"Q6",loc:"Outside John Jay",net:"Cellular",env:"Outside",time:"5:59 p.m.",rep:3,dl:127,ul:21.8,lat:29},
+];
+
+// =================== HELPERS ===================
+const avg = arr => arr.reduce((a,b) => a+b, 0) / arr.length;
+const std = arr => { const m = avg(arr); return Math.sqrt(avg(arr.map(x=>(x-m)**2))); };
+const filter = (net,env,time,q) => raw.filter(r =>
+  (!net || r.net===net) &&
+  (!env || r.env===env) &&
+  (!time || (time==='AM' ? (r.time.includes('a.m.') || parseInt(r.time)<12) : (r.time.includes('p.m.') || parseInt(r.time)>=12))) &&
+  (!q || r.q===q)
+);
+
+const WIFI_COLOR = 'rgba(0,229,255,0.85)';
+const CELL_COLOR = 'rgba(255,107,53,0.85)';
+const WIFI_BORDER = '#00e5ff';
+const CELL_BORDER = '#ff6b35';
+
+const chartDefaults = {
+  responsive: true,
+  maintainAspectRatio: false,
+  plugins: {
+    legend: { labels: { color: '#6b7a99', font: { family: 'Space Mono', size: 11 } } },
+    tooltip: { backgroundColor: '#1a2235', titleColor: '#e8edf5', bodyColor: '#6b7a99', borderColor: 'rgba(255,255,255,0.07)', borderWidth: 1 }
+  },
+  scales: {
+    x: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#6b7a99', font: { family: 'Space Mono', size: 10 } } },
+    y: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#6b7a99', font: { family: 'Space Mono', size: 10 } } }
+  }
+};
+
+// =================== INIT ===================
+function initOverview() {
+  const wifi = filter('Wi-Fi'); const cell = filter('Cellular');
+  document.getElementById('avg-wifi-dl').textContent = avg(wifi.map(r=>r.dl)).toFixed(1);
+  document.getElementById('avg-cell-dl').textContent = avg(cell.map(r=>r.dl)).toFixed(1);
+  document.getElementById('avg-wifi-lat').textContent = avg(wifi.map(r=>r.lat)).toFixed(1);
+  document.getElementById('avg-cell-lat').textContent = avg(cell.map(r=>r.lat)).toFixed(1);
+
+  const quads = ['Q1','Q2','Q3','Q4','Q5','Q6'];
+
+  // Download bar
+  new Chart(document.getElementById('chart-dl-bar'), {
+    type: 'bar',
+    data: {
+      labels: quads,
+      datasets: [
+        { label: 'Wi-Fi', data: quads.map(q => avg(filter('Wi-Fi',null,null,q).map(r=>r.dl)).toFixed(1)), backgroundColor: WIFI_COLOR, borderColor: WIFI_BORDER, borderWidth: 1 },
+        { label: '5G Cellular', data: quads.map(q => avg(filter('Cellular',null,null,q).map(r=>r.dl)).toFixed(1)), backgroundColor: CELL_COLOR, borderColor: CELL_BORDER, borderWidth: 1 }
+      ]
+    },
+    options: { ...chartDefaults, plugins: { ...chartDefaults.plugins, legend: { ...chartDefaults.plugins.legend } } }
+  });
+
+  // Upload bar
+  new Chart(document.getElementById('chart-ul-bar'), {
+    type: 'bar',
+    data: {
+      labels: quads,
+      datasets: [
+        { label: 'Wi-Fi', data: quads.map(q => avg(filter('Wi-Fi',null,null,q).map(r=>r.ul)).toFixed(1)), backgroundColor: WIFI_COLOR, borderColor: WIFI_BORDER, borderWidth: 1 },
+        { label: '5G Cellular', data: quads.map(q => avg(filter('Cellular',null,null,q).map(r=>r.ul)).toFixed(1)), backgroundColor: CELL_COLOR, borderColor: CELL_BORDER, borderWidth: 1 }
+      ]
+    },
+    options: chartDefaults
+  });
+
+  // Latency bar
+  new Chart(document.getElementById('chart-lat-bar'), {
+    type: 'bar',
+    data: {
+      labels: quads,
+      datasets: [
+        { label: 'Wi-Fi', data: quads.map(q => avg(filter('Wi-Fi',null,null,q).map(r=>r.lat)).toFixed(1)), backgroundColor: WIFI_COLOR, borderColor: WIFI_BORDER, borderWidth: 1 },
+        { label: '5G Cellular', data: quads.map(q => avg(filter('Cellular',null,null,q).map(r=>r.lat)).toFixed(1)), backgroundColor: CELL_COLOR, borderColor: CELL_BORDER, borderWidth: 1 }
+      ]
+    },
+    options: chartDefaults
+  });
+
+  // Scatter all readings
+  new Chart(document.getElementById('chart-scatter'), {
+    type: 'scatter',
+    data: {
+      datasets: [
+        { label: 'Wi-Fi', data: filter('Wi-Fi').map((r,i)=>({x:i+1,y:r.dl})), backgroundColor: 'rgba(0,229,255,0.5)', pointRadius: 4 },
+        { label: '5G Cellular', data: filter('Cellular').map((r,i)=>({x:i+1,y:r.dl})), backgroundColor: 'rgba(255,107,53,0.5)', pointRadius: 4 }
+      ]
+    },
+    options: { ...chartDefaults, scales: { ...chartDefaults.scales, x: { ...chartDefaults.scales.x, title: { display: true, text: 'Measurement index', color: '#6b7a99', font:{size:10} } }, y: { ...chartDefaults.scales.y, title: { display: true, text: 'Download (Mbps)', color: '#6b7a99', font:{size:10} } } } }
+  });
+}
+
+// =================== CAMPUS MAP ===================
+let quadChart = null;
+function selectQ(q) {
+  document.querySelectorAll('.q-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.q-btn').forEach(b => { if(b.textContent===q) b.classList.add('active'); });
+
+  const wIn = filter('Wi-Fi','Inside',null,q); const wOut = filter('Wi-Fi','Outside',null,q);
+  const cIn = filter('Cellular','Inside',null,q); const cOut = filter('Cellular','Outside',null,q);
+
+  const loc = {Q1:'Pupin / Shapiro',Q2:'Mudd',Q3:'Earl Hall',Q4:'Avery Library',Q5:'Lerner Hall',Q6:'John Jay'};
+
+  const wInDl = avg(wIn.map(r=>r.dl)); const cInDl = avg(cIn.map(r=>r.dl));
+  const wOutDl = avg(wOut.map(r=>r.dl)); const cOutDl = avg(cOut.map(r=>r.dl));
+
+  const winIn = wInDl > cInDl ? 'Wi-Fi' : '5G';
+  const winOut = wOutDl > cOutDl ? 'Wi-Fi' : '5G';
+
+  document.getElementById('q-detail-content').innerHTML = `
+    <div style="margin-bottom:16px">
+      <div style="font-family:Space Mono,monospace;font-size:18px;font-weight:700;color:var(--wifi);margin-bottom:4px">${q}</div>
+      <div style="font-size:13px;color:var(--muted)">${loc[q]}</div>
+    </div>
+    <table class="q-detail-table">
+      <tr><th>Condition</th><th>Wi-Fi DL</th><th>5G DL</th><th>Winner</th></tr>
+      <tr>
+        <td><span class="badge badge-wifi">Indoor</span></td>
+        <td style="color:var(--wifi)">${wInDl.toFixed(1)}</td>
+        <td style="color:var(--cell)">${cInDl.toFixed(1)}</td>
+        <td><span class="badge ${winIn==='Wi-Fi'?'badge-wifi':'badge-cell'}">${winIn}</span></td>
+      </tr>
+      <tr>
+        <td><span class="badge badge-cell">Outdoor</span></td>
+        <td style="color:var(--wifi)">${wOutDl.toFixed(1)}</td>
+        <td style="color:var(--cell)">${cOutDl.toFixed(1)}</td>
+        <td><span class="badge ${winOut==='Wi-Fi'?'badge-wifi':'badge-cell'}">${winOut}</span></td>
+      </tr>
+      <tr>
+        <td>Latency Wi-Fi</td>
+        <td colspan="3" style="color:var(--wifi)">${avg(filter('Wi-Fi',null,null,q).map(r=>r.lat)).toFixed(1)} ms</td>
+      </tr>
+      <tr>
+        <td>Latency 5G</td>
+        <td colspan="3" style="color:var(--cell)">${avg(filter('Cellular',null,null,q).map(r=>r.lat)).toFixed(1)} ms</td>
+      </tr>
+    </table>
+  `;
+
+  if(quadChart) quadChart.destroy();
+  quadChart = new Chart(document.getElementById('chart-quad-detail'), {
+    type: 'radar',
+    data: {
+      labels: ['DL Indoor','DL Outdoor','UL Indoor','UL Outdoor','Latency⁻¹'],
+      datasets: [
+        {
+          label: 'Wi-Fi',
+          data: [
+            avg(wIn.map(r=>r.dl)), avg(wOut.map(r=>r.dl)),
+            avg(wIn.map(r=>r.ul)), avg(wOut.map(r=>r.ul)),
+            100 - avg(filter('Wi-Fi',null,null,q).map(r=>r.lat))
+          ],
+          borderColor: WIFI_BORDER, backgroundColor: 'rgba(0,229,255,0.12)', pointBackgroundColor: WIFI_BORDER
+        },
+        {
+          label: '5G',
+          data: [
+            avg(cIn.map(r=>r.dl)), avg(cOut.map(r=>r.dl)),
+            avg(cIn.map(r=>r.ul)), avg(cOut.map(r=>r.ul)),
+            100 - avg(filter('Cellular',null,null,q).map(r=>r.lat))
+          ],
+          borderColor: CELL_BORDER, backgroundColor: 'rgba(255,107,53,0.12)', pointBackgroundColor: CELL_BORDER
+        }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { labels: { color: '#6b7a99', font: { family: 'Space Mono', size: 11 } } } },
+      scales: { r: { grid: { color: 'rgba(255,255,255,0.06)' }, pointLabels: { color: '#6b7a99', font: { family: 'Space Mono', size: 10 } }, ticks: { display: false } } }
+    }
+  });
+}
+
+function initCampus() {
+  selectQ('Q1');
+
+  // Winner heatmap using bar chart
+  const quads = ['Q1','Q2','Q3','Q4','Q5','Q6'];
+  const conditions = ['Wi-Fi Indoor','Wi-Fi Outdoor','5G Indoor','5G Outdoor'];
+  new Chart(document.getElementById('chart-heatmap'), {
+    type: 'bar',
+    data: {
+      labels: quads,
+      datasets: [
+        { label: 'Wi-Fi Indoor DL', data: quads.map(q=>avg(filter('Wi-Fi','Inside',null,q).map(r=>r.dl)).toFixed(1)), backgroundColor: 'rgba(0,229,255,0.7)' },
+        { label: 'Wi-Fi Outdoor DL', data: quads.map(q=>avg(filter('Wi-Fi','Outside',null,q).map(r=>r.dl)).toFixed(1)), backgroundColor: 'rgba(0,229,255,0.35)' },
+        { label: '5G Indoor DL', data: quads.map(q=>avg(filter('Cellular','Inside',null,q).map(r=>r.dl)).toFixed(1)), backgroundColor: 'rgba(255,107,53,0.7)' },
+        { label: '5G Outdoor DL', data: quads.map(q=>avg(filter('Cellular','Outside',null,q).map(r=>r.dl)).toFixed(1)), backgroundColor: 'rgba(255,107,53,0.35)' }
+      ]
+    },
+    options: { ...chartDefaults, plugins: { ...chartDefaults.plugins } }
+  });
+}
+
+// =================== ENVIRONMENT ===================
+function initEnvironment() {
+  const wIn = filter('Wi-Fi','Inside'); const wOut = filter('Wi-Fi','Outside');
+  const cIn = filter('Cellular','Inside'); const cOut = filter('Cellular','Outside');
+  document.getElementById('wifi-in-dl').textContent = avg(wIn.map(r=>r.dl)).toFixed(1);
+  document.getElementById('wifi-out-dl').textContent = avg(wOut.map(r=>r.dl)).toFixed(1);
+  document.getElementById('cell-in-dl').textContent = avg(cIn.map(r=>r.dl)).toFixed(1);
+  document.getElementById('cell-out-dl').textContent = avg(cOut.map(r=>r.dl)).toFixed(1);
+
+  const envData = (metric) => ({
+    labels: ['Indoor','Outdoor'],
+    datasets: [
+      { label:'Wi-Fi', data:[avg(wIn.map(r=>r[metric])).toFixed(1),avg(wOut.map(r=>r[metric])).toFixed(1)], backgroundColor:[WIFI_COLOR,WIFI_COLOR], borderColor:WIFI_BORDER, borderWidth:1 },
+      { label:'5G', data:[avg(cIn.map(r=>r[metric])).toFixed(1),avg(cOut.map(r=>r[metric])).toFixed(1)], backgroundColor:[CELL_COLOR,CELL_COLOR], borderColor:CELL_BORDER, borderWidth:1 }
+    ]
+  });
+
+  new Chart(document.getElementById('chart-env-dl'), { type:'bar', data:envData('dl'), options:chartDefaults });
+  new Chart(document.getElementById('chart-env-ul'), { type:'bar', data:envData('ul'), options:chartDefaults });
+  new Chart(document.getElementById('chart-env-lat'), { type:'bar', data:envData('lat'), options:chartDefaults });
+
+  const quads = ['Q1','Q2','Q3','Q4','Q5','Q6'];
+  const wDelta = quads.map(q => {
+    const wi = avg(filter('Wi-Fi','Inside',null,q).map(r=>r.dl));
+    const wo = avg(filter('Wi-Fi','Outside',null,q).map(r=>r.dl));
+    return (wi - wo).toFixed(1);
+  });
+  const cDelta = quads.map(q => {
+    const ci = avg(filter('Cellular','Inside',null,q).map(r=>r.dl));
+    const co = avg(filter('Cellular','Outside',null,q).map(r=>r.dl));
+    return (ci - co).toFixed(1);
+  });
+
+  new Chart(document.getElementById('chart-env-delta'), {
+    type: 'bar',
+    data: {
+      labels: quads,
+      datasets: [
+        { label:'Wi-Fi (In-Out)', data:wDelta, backgroundColor: wDelta.map(v=>v>0?WIFI_COLOR:'rgba(0,229,255,0.3)'), borderColor:WIFI_BORDER, borderWidth:1 },
+        { label:'5G (In-Out)', data:cDelta, backgroundColor: cDelta.map(v=>v>0?CELL_COLOR:'rgba(255,107,53,0.3)'), borderColor:CELL_BORDER, borderWidth:1 }
+      ]
+    },
+    options: { ...chartDefaults, plugins: { ...chartDefaults.plugins, tooltip: { ...chartDefaults.plugins.tooltip, callbacks: { label: ctx => `${ctx.dataset.label}: ${ctx.raw > 0 ? '+' : ''}${ctx.raw} Mbps` } } } }
+  });
+}
+
+// =================== TIME ===================
+function initTime() {
+  const wAM = filter('Wi-Fi',null,'AM'); const wPM = filter('Wi-Fi',null,'PM');
+  const cAM = filter('Cellular',null,'AM'); const cPM = filter('Cellular',null,'PM');
+  document.getElementById('wifi-am-dl').textContent = avg(wAM.map(r=>r.dl)).toFixed(1);
+  document.getElementById('wifi-pm-dl').textContent = avg(wPM.map(r=>r.dl)).toFixed(1);
+  document.getElementById('cell-am-dl').textContent = avg(cAM.map(r=>r.dl)).toFixed(1);
+  document.getElementById('cell-pm-dl').textContent = avg(cPM.map(r=>r.dl)).toFixed(1);
+
+  new Chart(document.getElementById('chart-time-dl'), {
+    type: 'bar',
+    data: {
+      labels: ['AM','PM'],
+      datasets: [
+        { label:'Wi-Fi', data:[avg(wAM.map(r=>r.dl)).toFixed(1),avg(wPM.map(r=>r.dl)).toFixed(1)], backgroundColor:WIFI_COLOR, borderColor:WIFI_BORDER, borderWidth:1 },
+        { label:'5G', data:[avg(cAM.map(r=>r.dl)).toFixed(1),avg(cPM.map(r=>r.dl)).toFixed(1)], backgroundColor:CELL_COLOR, borderColor:CELL_BORDER, borderWidth:1 }
+      ]
+    }, options: chartDefaults
+  });
+
+  new Chart(document.getElementById('chart-time-lat'), {
+    type: 'bar',
+    data: {
+      labels: ['AM','PM'],
+      datasets: [
+        { label:'Wi-Fi', data:[avg(wAM.map(r=>r.lat)).toFixed(1),avg(wPM.map(r=>r.lat)).toFixed(1)], backgroundColor:WIFI_COLOR, borderColor:WIFI_BORDER, borderWidth:1 },
+        { label:'5G', data:[avg(cAM.map(r=>r.lat)).toFixed(1),avg(cPM.map(r=>r.lat)).toFixed(1)], backgroundColor:CELL_COLOR, borderColor:CELL_BORDER, borderWidth:1 }
+      ]
+    }, options: chartDefaults
+  });
+
+  const quads = ['Q1','Q2','Q3','Q4','Q5','Q6'];
+  new Chart(document.getElementById('chart-am-quad'), {
+    type: 'bar',
+    data: {
+      labels: quads,
+      datasets: [
+        { label:'Wi-Fi AM', data:quads.map(q=>avg(filter('Wi-Fi',null,'AM',q).map(r=>r.dl)).toFixed(1)), backgroundColor:WIFI_COLOR, borderColor:WIFI_BORDER, borderWidth:1 },
+        { label:'5G AM', data:quads.map(q=>avg(filter('Cellular',null,'AM',q).map(r=>r.dl)).toFixed(1)), backgroundColor:CELL_COLOR, borderColor:CELL_BORDER, borderWidth:1 }
+      ]
+    }, options: chartDefaults
+  });
+
+  new Chart(document.getElementById('chart-pm-quad'), {
+    type: 'bar',
+    data: {
+      labels: quads,
+      datasets: [
+        { label:'Wi-Fi PM', data:quads.map(q=>avg(filter('Wi-Fi',null,'PM',q).map(r=>r.dl)).toFixed(1)), backgroundColor:'rgba(0,229,255,0.5)', borderColor:WIFI_BORDER, borderWidth:1 },
+        { label:'5G PM', data:quads.map(q=>avg(filter('Cellular',null,'PM',q).map(r=>r.dl)).toFixed(1)), backgroundColor:'rgba(255,107,53,0.5)', borderColor:CELL_BORDER, borderWidth:1 }
+      ]
+    }, options: chartDefaults
+  });
+}
+
+// =================== RELIABILITY ===================
+function initReliability() {
+  const quads = ['Q1','Q2','Q3','Q4','Q5','Q6'];
+
+  const wCVs = quads.map(q => { const d = filter('Wi-Fi',null,null,q).map(r=>r.dl); return (std(d)/avg(d)*100).toFixed(1); });
+  const cCVs = quads.map(q => { const d = filter('Cellular',null,null,q).map(r=>r.dl); return (std(d)/avg(d)*100).toFixed(1); });
+
+  new Chart(document.getElementById('chart-cv'), {
+    type: 'bar',
+    data: {
+      labels: quads,
+      datasets: [
+        { label:'Wi-Fi CV%', data:wCVs, backgroundColor:WIFI_COLOR, borderColor:WIFI_BORDER, borderWidth:1 },
+        { label:'5G CV%', data:cCVs, backgroundColor:CELL_COLOR, borderColor:CELL_BORDER, borderWidth:1 }
+      ]
+    },
+    options: { ...chartDefaults, plugins: { ...chartDefaults.plugins, tooltip: { ...chartDefaults.plugins.tooltip, callbacks: { label: ctx => `${ctx.dataset.label}: ${ctx.raw}%` } } } }
+  });
+
+  const wStds = quads.map(q => std(filter('Wi-Fi',null,null,q).map(r=>r.dl)).toFixed(1));
+  const cStds = quads.map(q => std(filter('Cellular',null,null,q).map(r=>r.dl)).toFixed(1));
+
+  new Chart(document.getElementById('chart-std'), {
+    type: 'bar',
+    data: {
+      labels: quads,
+      datasets: [
+        { label:'Wi-Fi σ', data:wStds, backgroundColor:WIFI_COLOR, borderColor:WIFI_BORDER, borderWidth:1 },
+        { label:'5G σ', data:cStds, backgroundColor:CELL_COLOR, borderColor:CELL_BORDER, borderWidth:1 }
+      ]
+    }, options: chartDefaults
+  });
+
+  new Chart(document.getElementById('chart-all-scatter'), {
+    type: 'scatter',
+    data: {
+      datasets: [
+        { label:'Wi-Fi', data: filter('Wi-Fi').map((r,i)=>({x:i,y:r.dl})), backgroundColor:'rgba(0,229,255,0.55)', pointRadius:5 },
+        { label:'5G', data: filter('Cellular').map((r,i)=>({x:i,y:r.dl})), backgroundColor:'rgba(255,107,53,0.55)', pointRadius:5 }
+      ]
+    },
+    options: { ...chartDefaults, scales: { ...chartDefaults.scales, y: { ...chartDefaults.scales.y, title:{display:true,text:'Download Mbps',color:'#6b7a99',font:{size:10}} } } }
+  });
+
+  // Table
+  const tbl = document.getElementById('reliability-table');
+  tbl.innerHTML = `<tr><th>Quadrant</th><th>Network</th><th>Mean DL</th><th>Std Dev</th><th>CV%</th><th>Range</th></tr>`;
+  quads.forEach(q => {
+    ['Wi-Fi','Cellular'].forEach(net => {
+      const d = filter(net,null,null,q).map(r=>r.dl);
+      const m = avg(d); const s = std(d); const cv = (s/m*100);
+      const mn = Math.min(...d); const mx = Math.max(...d);
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${q}</td>
+        <td><span class="badge ${net==='Wi-Fi'?'badge-wifi':'badge-cell'}">${net}</span></td>
+        <td>${m.toFixed(1)}</td>
+        <td>${s.toFixed(1)}</td>
+        <td>
+          <div>${cv.toFixed(1)}%</div>
+          <div class="bar-bg"><div class="bar-fill ${net==='Wi-Fi'?'bar-wifi':'bar-cell'}" style="width:${Math.min(cv*2,100)}%"></div></div>
+        </td>
+        <td style="color:var(--muted)">${mn.toFixed(1)}–${mx.toFixed(1)}</td>
+      `;
+      tbl.appendChild(tr);
+    });
+  });
+}
+
+// =================== FINDINGS ===================
+function initInsights() {
+  const wAll = filter('Wi-Fi'); const cAll = filter('Cellular');
+  const wAvgDl = avg(wAll.map(r=>r.dl)); const cAvgDl = avg(cAll.map(r=>r.dl));
+  const wAvgLat = avg(wAll.map(r=>r.lat)); const cAvgLat = avg(cAll.map(r=>r.lat));
+
+  const q5wIn = avg(filter('Wi-Fi','Inside',null,'Q5').map(r=>r.dl));
+  const q5cIn = avg(filter('Cellular','Inside',null,'Q5').map(r=>r.dl));
+  const q6wIn = avg(filter('Wi-Fi','Inside',null,'Q6').map(r=>r.dl));
+  const q6cIn = avg(filter('Cellular','Inside',null,'Q6').map(r=>r.dl));
+
+  const insights = [
+    { type:'', title:'Overall Download Winner', text:`Wi-Fi averaged <strong>${wAvgDl.toFixed(1)} Mbps</strong> vs. 5G at ${cAvgDl.toFixed(1)} Mbps — but this hides enormous variation across quadrants. The aggregate advantage for Wi-Fi is largely driven by indoor performance in academic buildings.` },
+    { type:'orange', title:'Latency: 5G Never Wins', text:`Wi-Fi latency averaged <strong>${wAvgLat.toFixed(1)} ms</strong> vs. 5G at ${cAvgLat.toFixed(1)} ms. Wi-Fi has a ~4–5× lower latency advantage across every single quadrant and condition — a clear and consistent result.` },
+    { type:'green', title:'The Q5/Q6 Reversal', text:`In Lerner Hall (Q5), 5G indoors hit <strong>${q5cIn.toFixed(1)} Mbps</strong> — nearly double Wi-Fi's ${q5wIn.toFixed(1)} Mbps. John Jay (Q6) is even more striking: Wi-Fi averages only ~${q6wIn.toFixed(1)} Mbps indoors while 5G reaches ${q6cIn.toFixed(1)} Mbps. These are outlier buildings where campus Wi-Fi appears under-provisioned.` },
+    { type:'yellow', title:'Outdoor: 5G Closes the Gap', text:`Outdoors, <strong>5G is consistently more competitive</strong> and wins in Q4, Q5, and Q6. Wi-Fi's outdoor advantage is strongest in Q1–Q3 (upper campus). Lower campus outdoor 5G is notably stronger, suggesting a denser tower deployment near 114th St.` },
+    { type:'', title:'Wi-Fi Reliability', text:`Wi-Fi has a lower coefficient of variation than 5G in Q1–Q3 (σ ~25 Mbps vs. ~35 Mbps for 5G). However, Q4–Q6 show higher Wi-Fi variance — particularly Q4 (Avery) and Q6 (John Jay), where <strong>Wi-Fi is neither fast nor consistent</strong>.` },
+    { type:'orange', title:'5G Upload Weakness', text:`5G upload speeds collapsed in Q4 (Avery Library indoor): avg <strong>~8 Mbps</strong> vs. Wi-Fi's 157 Mbps. This is a consistent anomaly across both AM and PM sessions, suggesting deep indoor signal degradation for uplink in that building.` },
+    { type:'green', title:'Policy Implication', text:`Wi-Fi cannot be assumed to be a reliable broadband substitute across the entire campus. Buildings like Lerner Hall and John Jay show that <strong>5G is the superior option</strong> for high-throughput tasks, challenging the assumption that institutional Wi-Fi always offloads cellular demand effectively.` },
+    { type:'yellow', title:'AM vs PM Stability', text:`Wi-Fi download speeds drop by an average of <strong>~15 Mbps in the PM</strong> versus AM, consistent with increased daytime congestion. 5G shows less time-of-day variation, suggesting the cellular network is less susceptible to campus load patterns.` }
+  ];
+
+  const container = document.getElementById('insights-container');
+  container.innerHTML = insights.map(i => `
+    <div class="insight-card ${i.type}">
+      <div class="insight-title">${i.title}</div>
+      <div class="insight-text">${i.text}</div>
+    </div>
+  `).join('');
+}
+
+// =================== TABS ===================
+const initialized = {};
+function switchTab(name) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  event.target.classList.add('active');
+  document.getElementById('tab-'+name).classList.add('active');
+
+  if (!initialized[name]) {
+    initialized[name] = true;
+    if (name === 'overview') initOverview();
+    if (name === 'campus') initCampus();
+    if (name === 'environment') initEnvironment();
+    if (name === 'time') initTime();
+    if (name === 'reliability') initReliability();
+    if (name === 'insights') initInsights();
+  }
+}
+
+// Init first tab
+initialized['overview'] = true;
+initOverview();
+</script>
+</body>
+</html>
